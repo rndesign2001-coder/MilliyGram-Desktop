@@ -1,0 +1,180 @@
+name: MilliyGram Desktop (Windows)
+
+# Windows x64 uchun MilliyGram Desktop'ni yig'adi: o'rnatuvchi (Setup.exe) va portativ zip.
+# Telegram API kalitlari faqat GitHub Secrets'dan olinadi: API_ID, API_HASH.
+# Kutubxonalar (Qt va b.) birinchi marta bir necha soat yig'iladi — natija keshga saqlanadi,
+# vaqt yetmasa keyingi ishga tushirishda shu joydan davom etadi.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: win-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Windows x64
+    runs-on: windows-latest
+    timeout-minutes: 355
+
+    env:
+      PREPARE_PATH: "Telegram/build/prepare/prepare.py"
+      MG_VERSION: "1.0.0"
+
+    defaults:
+      run:
+        shell: cmd
+
+    steps:
+      - name: Papkalar.
+        run: |
+          mkdir %userprofile%\TBuild\Libraries
+          mklink /d %GITHUB_WORKSPACE%\TBuild %userprofile%\TBuild
+          echo TBUILD=%GITHUB_WORKSPACE%\TBuild>>%GITHUB_ENV%
+          echo LibrariesPath=%GITHUB_WORKSPACE%\TBuild\Libraries\win64>>%GITHUB_ENV%
+
+      - name: Repozitoriy nomi.
+        shell: bash
+        run: echo "REPO_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
+
+      - name: Kod.
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}
+
+      - name: Sozlash.
+        shell: bash
+        run: |
+          DOCPATH=$TBUILD/$REPO_NAME/docs/building-win.md
+          SDK="$(grep "SDK version" $DOCPATH | sed -r 's/.*\*\*(.*)\*\* SDK version.*/\1/')"
+          echo "SDK=$SDK" >> $GITHUB_ENV
+          sed -i '/CMAKE_${lang}_FLAGS_DEBUG_INIT/s/${_Zi}//' "$PROGRAMFILES"/CMake/share/cmake*/Modules/Platform/Windows-MSVC.cmake
+          echo "$(sha256sum $TBUILD/$REPO_NAME/$PREPARE_PATH | awk '{ print $1 }')" >> CACHE_KEY.txt
+          echo "$SDK" >> CACHE_KEY.txt
+          echo "CACHE_KEY=$(sha256sum CACHE_KEY.txt | awk '{ print $1 }')" >> $GITHUB_ENV
+          git config --global user.email "ci@milliygram.local"
+          git config --global user.name "MilliyGram CI"
+
+      - uses: Eden-CI/msvc-dev-cmd@master
+        name: MSVC muhiti.
+        with:
+          arch: x64
+          sdk: ${{ env.SDK }}
+          toolset: '14.44'
+
+      - name: NuGet.
+        run: |
+          nuget sources Disable -Name "Microsoft Visual Studio Offline Packages"
+          nuget sources Add -Source https://api.nuget.org/v3/index.json & exit 0
+
+      - name: ThirdParty keshini tiklash.
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.TBUILD }}\ThirdParty
+          key: win-third-party-${{ env.CACHE_KEY }}-${{ github.run_id }}
+          restore-keys: win-third-party-
+
+      - name: Kutubxonalar keshini tiklash.
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.LibrariesPath }}
+          key: win-x64-qt6-libs-${{ env.CACHE_KEY }}-${{ github.run_id }}
+          restore-keys: |
+            win-x64-qt6-libs-${{ env.CACHE_KEY }}-
+            win-x64-qt6-libs-
+
+      - name: Kutubxonalar (Qt, ffmpeg, OpenSSL va b.).
+        id: libs
+        continue-on-error: true
+        timeout-minutes: 290
+        run: |
+          %TBUILD%\%REPO_NAME%\Telegram\build\prepare\win.bat skip-release silent qt6
+
+      - name: Diskni bo'shatish.
+        if: always()
+        shell: bash
+        run: find $LibrariesPath '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -path '*/nv-codec-headers/*' ')' -type f ')' -o -empty ')' -delete || true
+
+      - name: ThirdParty keshini saqlash.
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.TBUILD }}\ThirdParty
+          key: win-third-party-${{ env.CACHE_KEY }}-${{ github.run_id }}
+
+      - name: Kutubxonalar keshini saqlash.
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.LibrariesPath }}
+          key: win-x64-qt6-libs-${{ env.CACHE_KEY }}-${{ github.run_id }}
+
+      - name: Kutubxonalar tayyormi?
+        if: steps.libs.outcome != 'success'
+        shell: bash
+        run: |
+          echo "::warning::Kutubxonalar hali to'liq yig'ilmadi (vaqt yetmadi). Natija keshga saqlandi — workflow'ni yana ishga tushiring, shu joydan davom etadi."
+          exit 1
+
+      - name: MilliyGram Desktop'ni yig'ish.
+        env:
+          API_ID: ${{ secrets.API_ID }}
+          API_HASH: ${{ secrets.API_HASH }}
+        run: |
+          if "%API_ID%"=="" (echo ::error::API_ID secret qo'yilmagan & exit /b 1)
+          cd %TBUILD%\%REPO_NAME%\Telegram
+          call configure.bat x64 qt6 ^
+          -D TDESKTOP_API_ID=%API_ID% ^
+          -D TDESKTOP_API_HASH=%API_HASH% ^
+          -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
+          -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON ^
+          -D CMAKE_MSVC_DEBUG_INFORMATION_FORMAT= || exit /b 1
+          cmake --build ..\out --config Release --parallel || exit /b 1
+
+      - name: Paketlash (portativ zip + o'rnatuvchi).
+        shell: pwsh
+        run: |
+          $out = "$env:TBUILD\$env:REPO_NAME\out\Release"
+          $dist = "$env:GITHUB_WORKSPACE\dist\MilliyGram"
+          New-Item -ItemType Directory -Force -Path $dist | Out-Null
+          Copy-Item "$out\Telegram.exe" "$dist\MilliyGram.exe"
+          $d3d = Get-ChildItem -Path $out -Recurse -Filter d3dcompiler_47.dll -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($d3d) {
+            New-Item -ItemType Directory -Force -Path "$dist\modules\x64\d3d" | Out-Null
+            Copy-Item $d3d.FullName "$dist\modules\x64\d3d\"
+          }
+          Compress-Archive -Path "$dist\*" -DestinationPath "$env:GITHUB_WORKSPACE\MilliyGram-Desktop-$env:MG_VERSION-portable-x64.zip" -Force
+          choco install innosetup -y --no-progress
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$env:MG_VERSION" "/DDistPath=$dist" "/DIconPath=$env:TBUILD\$env:REPO_NAME\Telegram\Resources\art\icon256.ico" "/O$env:GITHUB_WORKSPACE" "$env:TBUILD\$env:REPO_NAME\milliygram\setup.iss"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - uses: actions/upload-artifact@v7
+        name: Artefakt.
+        with:
+          name: MilliyGram-Desktop-${{ env.MG_VERSION }}-b${{ github.run_number }}
+          path: |
+            MilliyGram-Desktop-*.zip
+            MilliyGram-Setup-*.exe
+
+      - name: Reliz.
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: desktop-v${{ env.MG_VERSION }}-b${{ github.run_number }}
+          name: MilliyGram Desktop ${{ env.MG_VERSION }} (b${{ github.run_number }})
+          body: |
+            MilliyGram Desktop — Windows x64.
+            - MilliyGram-Setup-x64.exe — o'rnatuvchi
+            - portable zip — o'rnatmasdan ishlaydi
+          files: |
+            MilliyGram-Desktop-*.zip
+            MilliyGram-Setup-*.exe
