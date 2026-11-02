@@ -2,7 +2,7 @@ name: MilliyGram Desktop (Windows)
 
 # Windows x64 uchun MilliyGram Desktop'ni yig'adi: o'rnatuvchi (Setup.exe) va portativ zip.
 # Telegram API kalitlari faqat GitHub Secrets'dan olinadi: API_ID, API_HASH.
-# Kutubxonalar (Qt va b.) birinchi marta bir necha soat yig'iladi — natija keshga saqlanadi,
+# Kutubxonalar (Qt va b.) Release rejimida birinchi marta bir necha soat yig'iladi — natija keshga saqlanadi,
 # vaqt yetmasa keyingi ishga tushirishda shu joydan davom etadi.
 
 on:
@@ -111,7 +111,7 @@ jobs:
         continue-on-error: true
         timeout-minutes: 290
         run: |
-          %TBUILD%\%REPO_NAME%\Telegram\build\prepare\win.bat skip-release silent qt6
+          %TBUILD%\%REPO_NAME%\Telegram\build\prepare\win.bat silent qt6
 
       - name: Diskni bo'shatish.
         if: always()
