@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_stories.h"
+#include "milliygram/mg_settings.h"
 
 #include "base/unixtime.h"
 #include "apiwrap.h"
@@ -1401,6 +1402,10 @@ void Stories::sendMarkAsReadRequest(
 		checkQuitPreventFinished();
 	};
 
+	if (MilliyGram::GhostEnabled()) {
+		finish(); // MilliyGram: sharpa rejimi — hikoya ko'rilgani bildirilmaydi
+		return;
+	}
 	const auto api = &_owner->session().api();
 	api->request(MTPstories_ReadStories(
 		peer->input(),
@@ -1463,6 +1468,11 @@ void Stories::sendIncrementViewsRequests() {
 			}
 			checkQuitPreventFinished();
 		};
+		if (MilliyGram::GhostEnabled()) {
+			_incrementViewsPending.remove(peer);
+			finish();
+			continue;
+		}
 		api->request(MTPstories_IncrementStoryViews(
 			_owner->peer(peer)->input(),
 			MTP_vector<MTPint>(std::move(ids))

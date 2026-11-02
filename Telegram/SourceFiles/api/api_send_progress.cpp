@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "api/api_send_progress.h"
 
+#include "milliygram/mg_settings.h"
+
 #include "main/main_session.h"
 #include "history/history.h"
 #include "data/data_peer.h"
@@ -133,6 +135,9 @@ void SendProgressManager::send(const Key &key, int progress) {
 		default: return MTP_sendMessageTypingAction();
 		}
 	}();
+	if (MilliyGram::GhostEnabled() && key.type != Type::Speaking) {
+		return; // MilliyGram: sharpa rejimi — "yozmoqda…" yuborilmaydi
+	}
 	const auto requestId = _session->api().request(MTPmessages_SetTyping(
 		MTP_flags(key.topMsgId
 			? MTPmessages_SetTyping::Flag::f_top_msg_id

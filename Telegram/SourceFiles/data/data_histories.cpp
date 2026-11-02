@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_histories.h"
 
+#include "milliygram/mg_settings.h"
+
 #include "api/api_text_entities.h"
 #include "data/business/data_shortcut_messages.h"
 #include "data/components/ephemeral_messages.h"
@@ -709,6 +711,10 @@ void Histories::reportPendingDeliveries() {
 				reportPendingDeliveries();
 			}
 		};
+		if (MilliyGram::GhostEnabled()) {
+			finish();
+			continue;
+		}
 		session().api().request(MTPmessages_ReportMessagesDelivery(
 			MTP_flags(0),
 			peer->input(),
@@ -747,6 +753,12 @@ void Histories::sendReadRequests() {
 void Histories::sendReadRequest(not_null<History*> history, State &state) {
 	Expects(state.willReadTill > state.sentReadTill);
 
+	if (MilliyGram::GhostEnabled()) {
+		// MilliyGram: sharpa rejimi — "o'qildi" belgisi serverga yuborilmaydi.
+		state.willReadTill = 0;
+		state.willReadWhen = 0;
+		return;
+	}
 	const auto tillId = state.sentReadTill = base::take(state.willReadTill);
 	state.willReadWhen = 0;
 	state.sentReadDone = false;

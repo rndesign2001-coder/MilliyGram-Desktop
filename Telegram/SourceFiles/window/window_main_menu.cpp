@@ -45,6 +45,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/localstorage.h"
 #include "storage/storage_account.h"
 #include "support/support_templates.h"
+#include "milliygram/mg_settings.h"
 #include "tde2e/tde2e_api.h"
 #include "tde2e/tde2e_integration.h"
 #include "ui/boxes/confirm_box.h"
@@ -773,6 +774,17 @@ void MainMenu::setupMenu() {
 	)->setClickedCallback([=] {
 		controller->showSettings();
 	});
+
+	// MilliyGram: sharpa rejimi — o'qildi, "yozmoqda…" va onlayn holat yuborilmaydi
+	addAction(
+		rpl::single(QString::fromUtf8("Sharpa rejimi")),
+		{ &st::menuIconStealth }
+	)->toggleOn(
+		MilliyGram::GhostValue()
+	)->toggledChanges(
+	) | rpl::on_next([](bool enabled) {
+		MilliyGram::SetGhostEnabled(enabled);
+	}, _menu->lifetime());
 
 	_nightThemeToggle = addAction(
 		tr::lng_menu_night_mode(),

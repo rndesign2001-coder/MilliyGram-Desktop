@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "api/api_updates.h"
 
+#include "milliygram/mg_settings.h"
+
 #include "api/api_authorizations.h"
 #include "api/api_user_names.h"
 #include "api/api_chat_participants.h"
@@ -1016,6 +1018,9 @@ void Updates::updateOnline(crl::time lastNonIdleTime, bool gotOtherOffline) {
 				int(config.offlineIdleTimeout - idle));
 			Assert(updateIn >= 0);
 		}
+	}
+	if (MilliyGram::GhostEnabled()) {
+		isOnline = false; // MilliyGram: sharpa rejimi — doim "offline"
 	}
 	auto ms = crl::now();
 	if (isOnline != _lastWasOnline

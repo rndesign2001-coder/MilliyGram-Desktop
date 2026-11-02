@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "apiwrap.h"
+#include "milliygram/mg_settings.h"
 
 #include "api/api_authorizations.h"
 #include "api/api_attached_stickers.h"
@@ -1453,6 +1454,9 @@ void ApiWrap::markContentsRead(
 			markedIds.push_back(MTP_int(item->id));
 		}
 	}
+	if (MilliyGram::GhostEnabled()) {
+		return; // MilliyGram: sharpa rejimi — tinglangani/ko'rilgani bildirilmaydi
+	}
 	if (!markedIds.isEmpty()) {
 		request(MTPmessages_ReadMessageContents(
 			MTP_vector<MTPint>(markedIds)
@@ -1471,6 +1475,9 @@ void ApiWrap::markContentsRead(
 void ApiWrap::markContentsRead(not_null<HistoryItem*> item) {
 	if (!item->markContentsRead(true) || !item->isRegular()) {
 		return;
+	}
+	if (MilliyGram::GhostEnabled()) {
+		return; // MilliyGram: sharpa rejimi
 	}
 	const auto ids = MTP_vector<MTPint>(1, MTP_int(item->id));
 	if (const auto channel = item->history()->peer->asChannel()) {
