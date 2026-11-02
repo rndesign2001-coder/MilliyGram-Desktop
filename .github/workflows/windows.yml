@@ -93,6 +93,19 @@ jobs:
             win-x64-qt6-libs-${{ env.CACHE_KEY }}-
             win-x64-qt6-libs-
 
+      - name: Rust ko'prigi butunligini tekshirish.
+        shell: bash
+        run: |
+          # Avvalgi kesh tozalashda tdesktop_rust/out/src ichidagi .cpp fayllar o'chib ketgan bo'lishi mumkin —
+          # bunday holda shu bosqichni qayta yig'dirish uchun uning kesh kalitini o'chiramiz.
+          if [ -d "$LibrariesPath/tdesktop_rust" ] && [ ! -f "$LibrariesPath/tdesktop_rust/out/src/wallet_engine/wallet_engine.cpp" ]; then
+            echo "tdesktop_rust qayta yig'iladi"
+            for st in tdesktop_rust tlottie wallet-engine; do
+              rm -f "$LibrariesPath/cache_keys/$st"
+              rm -rf "$LibrariesPath/$st"
+            done
+          fi
+
       - name: Kutubxonalar (Qt, ffmpeg, OpenSSL va b.).
         id: libs
         continue-on-error: true
@@ -103,7 +116,7 @@ jobs:
       - name: Diskni bo'shatish.
         if: always()
         shell: bash
-        run: find $LibrariesPath '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -path '*/nv-codec-headers/*' ')' -type f ')' -o -empty ')' -delete || true
+        run: find $LibrariesPath '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/tdesktop_rust/out/*' -o -path '*/tlottie/*' -o -path '*/wallet-engine/*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -path '*/nv-codec-headers/*' ')' -type f ')' -o -empty ')' -delete || true
 
       - name: ThirdParty keshini saqlash.
         if: always()
