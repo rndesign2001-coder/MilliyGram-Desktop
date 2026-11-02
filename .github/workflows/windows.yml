@@ -139,6 +139,13 @@ jobs:
           echo "::warning::Kutubxonalar hali to'liq yig'ilmadi (vaqt yetmadi). Natija keshga saqlandi — workflow'ni yana ishga tushiring, shu joydan davom etadi."
           exit 1
 
+      - name: Virtual xotira (pagefile) — Release kompilyatsiyasi uchun.
+        uses: al-cheb/configure-pagefile-action@v1.4
+        with:
+          minimum-size: 16GB
+          maximum-size: 40GB
+          disk-root: "D:"
+
       - name: MilliyGram Desktop'ni yig'ish.
         env:
           API_ID: ${{ secrets.API_ID }}
@@ -152,7 +159,7 @@ jobs:
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON ^
           -D CMAKE_MSVC_DEBUG_INFORMATION_FORMAT= || exit /b 1
-          cmake --build ..\out --config Release --parallel || exit /b 1
+          cmake --build ..\out --config Release --parallel 2 -- /p:CL_MPCount=3 || exit /b 1
 
       - name: Paketlash (portativ zip + o'rnatuvchi).
         shell: pwsh
