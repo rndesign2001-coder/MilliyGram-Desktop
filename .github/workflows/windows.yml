@@ -37,8 +37,8 @@ jobs:
     steps:
       - name: Papkalar.
         run: |
-          mkdir %userprofile%\TBuild\Libraries
-          mklink /d %GITHUB_WORKSPACE%\TBuild %userprofile%\TBuild
+          rem C: diskda joy kam — hammasi katta D: diskda (workspace) yig'iladi
+          mkdir %GITHUB_WORKSPACE%\TBuild\Libraries
           echo TBUILD=%GITHUB_WORKSPACE%\TBuild>>%GITHUB_ENV%
           echo LibrariesPath=%GITHUB_WORKSPACE%\TBuild\Libraries\win64>>%GITHUB_ENV%
 
