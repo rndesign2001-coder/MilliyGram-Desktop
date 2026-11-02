@@ -167,7 +167,7 @@ jobs:
             MilliyGram-Setup-*.exe
 
       - name: Reliz.
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: desktop-v${{ env.MG_VERSION }}-b${{ github.run_number }}
           name: MilliyGram Desktop ${{ env.MG_VERSION }} (b${{ github.run_number }})
