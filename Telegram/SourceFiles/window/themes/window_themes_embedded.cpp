@@ -374,14 +374,14 @@ std::vector<EmbeddedScheme> EmbeddedThemes() {
 		},
 		EmbeddedScheme{
 			EmbeddedType::Night,
-			qColor("485761"),
-			qColor("5ca7d4"),
-			qColor("6b808d"),
-			qColor("6b808d"),
-			qColor("5ca7d4"),
-			name(tr::lng_settings_theme_tinted),
+			qColor("2a2836"),
+			qColor("7c5cff"),
+			qColor("3a3748"),
+			qColor("3a3748"),
+			qColor("7c5cff"),
+			rpl::single(QString::fromUtf8("MilliyGram")),
 			":/gui/night.tdesktop-theme",
-			qColor("5288c1")
+			qColor("8b6dff")
 		},
 		EmbeddedScheme{
 			EmbeddedType::NightGreen,
@@ -425,15 +425,16 @@ std::vector<QColor> DefaultAccentColors(EmbeddedType type) {
 			qColor("dea922"),
 		};
 	case EmbeddedType::Night:
+		// MilliyGram: binafsha, bayroq ko'ki va yashili, Samarqand firuzasi, atlas pushtisi, oltin
 		return {
-			qColor("58bfe8"),
-			qColor("466f42"),
-			qColor("aa6084"),
-			qColor("a46d3c"),
-			qColor("917bbd"),
-			qColor("ab5149"),
-			qColor("697b97"),
-			qColor("9b834b"),
+			qColor("8b6dff"),
+			qColor("1ea5d6"),
+			qColor("1eb53a"),
+			qColor("16a3a3"),
+			qColor("d6458f"),
+			qColor("e0a526"),
+			qColor("ce4b4b"),
+			qColor("6c7a96"),
 		};
 	case EmbeddedType::NightGreen:
 		return {

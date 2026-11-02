@@ -1585,6 +1585,19 @@ Section DetailsFiller::makeInfo() {
 		result.text->setContextCopyText(contextCopyText);
 		return result;
 	};
+	// MilliyGram: profil ID raqami (nusxa olish mumkin)
+	const auto addPeerIdLine = [&](not_null<PeerData*> peer) {
+		const auto id = peer->id;
+		const auto text = peerIsUser(id)
+			? QString::number(peerToUser(id).bare)
+			: peerIsChannel(id)
+			? (u"-100"_q + QString::number(peerToChannel(id).bare))
+			: (u"-"_q + QString::number(peerToChat(id).bare));
+		addInfoOneLine(
+			QString::fromUtf8("ID"),
+			rpl::single(TextWithEntities{ text }),
+			text);
+	};
 	const auto fitLabelToButton = [&](
 			not_null<Ui::RpWidget*> button,
 			not_null<Ui::FlatLabel*> label,
@@ -1714,6 +1727,7 @@ Section DetailsFiller::makeInfo() {
 			AboutWithAdvancedValue(user));
 		setupAboutContextMenu(about.text, AboutWithAdvancedValue(user));
 		SetupAboutPeerIdDrag(about.text, user);
+		addPeerIdLine(user);
 
 		const auto usernameLine = addInfoOneLine(
 			UsernamesSubtext(_peer, tr::lng_info_username_label()),
@@ -1896,6 +1910,7 @@ Section DetailsFiller::makeInfo() {
 		if (!_topic) {
 			setupAboutContextMenu(about.text, AboutWithAdvancedValue(_peer));
 			SetupAboutPeerIdDrag(about.text, _peer);
+			addPeerIdLine(_peer);
 		}
 	}
 	raw->toggleOn(tracker.atLeastOneShownValue());

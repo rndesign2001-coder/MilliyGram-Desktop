@@ -101,6 +101,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/call_delayed.h"
 #include "settings/sections/settings_premium.h"
 #include "window/window_peer_menu.h"
+#include "data/data_types.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
 #include "info/statistics/info_statistics_widget.h"
@@ -610,6 +611,19 @@ bool AddForwardMessageAction(
 				(asGroup
 					? owner->itemOrItsGroup(item)
 					: MessageIdsList{ 1, itemId }));
+		}
+	}, &st::menuIconForward);
+	// MilliyGram: maxsus uzatish — yuboruvchi nomisiz ("kimdan uzatildi" yozuvisiz)
+	menu->addAction(QString::fromUtf8("Maxsus uzatish"), [=] {
+		if (const auto item = owner->message(itemId)) {
+			Window::ShowForwardMessagesBox(
+				request.navigation,
+				Data::ForwardDraft{
+					.ids = (asGroup
+						? owner->itemOrItsGroup(item)
+						: MessageIdsList{ 1, itemId }),
+					.options = Data::ForwardOptions::NoSenderNames,
+				});
 		}
 	}, &st::menuIconForward);
 	return true;

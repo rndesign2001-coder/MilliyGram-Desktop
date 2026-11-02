@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "boxes/about_box.h"
 
+#include "milliygram/mg_settings.h"
+
 #include "base/platform/base_platform_info.h"
 #include "core/application.h"
 #include "core/file_utilities.h"
@@ -65,16 +67,15 @@ rpl::producer<TextWithEntities> Text3() {
 } // namespace
 
 void AboutBox(not_null<Ui::GenericBox*> box) {
-	box->setTitle(u"Telegram Desktop"_q);
+	box->setTitle(u"MilliyGram"_q);
 
 	auto layout = box->verticalLayout();
 
 	const auto version = layout->add(
 		object_ptr<Ui::LinkButton>(
 			box,
-			tr::lng_about_version(
-				tr::now,
-				lt_version,
+			QString::fromUtf8("MilliyGram %1 · Telegram %2").arg(
+				QString::fromUtf8(MilliyGram::kVersion),
 				currentVersionText()),
 			st::aboutVersionLink),
 		QMargins(
@@ -124,9 +125,10 @@ void AboutBox(not_null<Ui::GenericBox*> box) {
 		Ui::AddSkip(layout, st::aboutSkip);
 	};
 
-	addText(Text1());
+	addText(rpl::single(TextWithEntities{ QString::fromUtf8(
+		"MilliyGram — Telegram API asosida ishlaydigan mustaqil o'zbekcha messenjer.\n"
+		"Yangiliklar: @MilliyGramm · Chat: @MilliyGramChat") }));
 	addText(Text2());
-	addText(Text3());
 
 	box->addButton(tr::lng_close(), [=] { box->closeBox(); });
 

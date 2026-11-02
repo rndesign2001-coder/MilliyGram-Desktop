@@ -28,7 +28,7 @@ jobs:
 
     env:
       PREPARE_PATH: "Telegram/build/prepare/prepare.py"
-      MG_VERSION: "1.0.0"
+      MG_VERSION: "1.1.0"
 
     defaults:
       run:

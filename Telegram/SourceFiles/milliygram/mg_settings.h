@@ -9,6 +9,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace MilliyGram {
 
+inline constexpr auto kVersion = "1.1.0";
+
 // Sharpa rejimi: o'qilganlik, "yozmoqda…", onlayn holat va hikoya ko'rishlari serverga yuborilmaydi.
 [[nodiscard]] bool GhostEnabled();
 void SetGhostEnabled(bool enabled);

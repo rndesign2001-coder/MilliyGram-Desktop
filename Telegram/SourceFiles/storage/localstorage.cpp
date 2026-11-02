@@ -1228,7 +1228,7 @@ void InitialLoadTheme() {
 }
 
 bool ApplyDefaultNightMode() {
-	const auto NightByDefault = Platform::IsMacStoreBuild();
+	const auto NightByDefault = true; // MilliyGram: binafsha tungi mavzu standart
 	if (!NightByDefault
 		|| Window::Theme::IsNightMode()
 		|| _themeKeyDay
