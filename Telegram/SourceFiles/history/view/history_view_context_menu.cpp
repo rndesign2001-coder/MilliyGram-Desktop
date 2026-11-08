@@ -101,6 +101,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/call_delayed.h"
 #include "settings/sections/settings_premium.h"
 #include "window/window_peer_menu.h"
+#include "milliygram/mg_forward.h"
 #include "data/data_types.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
@@ -579,6 +580,15 @@ bool AddForwardSelectedAction(
 			ExtractIdsList(request.selectedItems),
 			callback);
 	}, &st::menuIconForward);
+	// MilliyGram: tanlangan xabarlarni maxsus uzatish
+	menu->addAction(QString::fromUtf8("Maxsus uzatish"), [=] {
+		const auto weak = base::make_weak(list);
+		const auto ids = ExtractIdsList(request.selectedItems);
+		MilliyGram::ShowCustomForward(request.navigation->uiShow(), ids);
+		if (const auto strong = weak.get()) {
+			strong->cancelSelection();
+		}
+	}, &st::menuIconForward);
 	return true;
 }
 
@@ -613,17 +623,14 @@ bool AddForwardMessageAction(
 					: MessageIdsList{ 1, itemId }));
 		}
 	}, &st::menuIconForward);
-	// MilliyGram: maxsus uzatish — yuboruvchi nomisiz ("kimdan uzatildi" yozuvisiz)
+	// MilliyGram: maxsus uzatish — izohni tahrirlash, vaqt, ovozsiz; "kimdan uzatildi"siz
 	menu->addAction(QString::fromUtf8("Maxsus uzatish"), [=] {
 		if (const auto item = owner->message(itemId)) {
-			Window::ShowForwardMessagesBox(
-				request.navigation,
-				Data::ForwardDraft{
-					.ids = (asGroup
-						? owner->itemOrItsGroup(item)
-						: MessageIdsList{ 1, itemId }),
-					.options = Data::ForwardOptions::NoSenderNames,
-				});
+			MilliyGram::ShowCustomForward(
+				request.navigation->uiShow(),
+				(asGroup
+					? owner->itemOrItsGroup(item)
+					: MessageIdsList{ 1, itemId }));
 		}
 	}, &st::menuIconForward);
 	return true;

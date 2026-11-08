@@ -25,6 +25,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_app_config.h"
 #include "main/main_account.h"
 #include "ui/boxes/confirm_box.h"
+#include "ui/layers/generic_box.h"
+#include "ui/widgets/fields/input_field.h"
 #include "core/application.h"
 #include "core/core_cloud_password.h"
 #include "core/update_checker.h"
@@ -32,6 +34,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "qr/qr_generate.h"
 #include "platform/platform_webauthn.h"
 #include "styles/style_intro.h"
+#include "styles/style_layers.h"
 
 namespace Intro {
 namespace details {
@@ -220,6 +223,7 @@ QrWidget::QrWidget(
 	}, lifetime());
 
 	setupControls();
+	setupBotLink();
 	account->mtp().mainDcIdValue(
 	) | rpl::on_next([=] {
 		api().request(base::take(_requestId)).cancel();
@@ -392,6 +396,7 @@ void QrWidget::setupPasskeyLink() {
 				+ st::introQrSkipTop
 				+ 1.5 * st::normalFont->height));
 	}, _passkey->lifetime());
+	updateBotLinkPosition();
 
 	_passkey->setClickedCallback([=] {
 		const auto attempt = [=](
@@ -438,6 +443,91 @@ void QrWidget::setupPasskeyLink() {
 			});
 		}
 	});
+}
+
+// MilliyGram: bot token orqali kirish (@BotFather bergan token bilan).
+void QrWidget::setupBotLink() {
+	_botLogin = Ui::CreateChild<Ui::LinkButton>(
+		this,
+		QString::fromUtf8("Bot token bilan kirish"));
+	_botLogin->show();
+	rpl::combine(
+		sizeValue(),
+		_botLogin->widthValue()
+	) | rpl::on_next([=](QSize, int) {
+		updateBotLinkPosition();
+	}, _botLogin->lifetime());
+	_botLogin->setClickedCallback([=] { showBotTokenBox(); });
+}
+
+void QrWidget::updateBotLinkPosition() {
+	if (!_botLogin) {
+		return;
+	}
+	const auto lines = _passkey ? 3.0 : 1.5;
+	_botLogin->moveToLeft(
+		(width() - _botLogin->width()) / 2,
+		(contentTop()
+			+ st::introQrSkipTop
+			+ int(lines * st::normalFont->height)));
+}
+
+void QrWidget::showBotTokenBox() {
+	Ui::show(Box([=](not_null<Ui::GenericBox*> box) {
+		box->setTitle(rpl::single(
+			QString::fromUtf8("Bot token bilan kirish")));
+		box->addRow(object_ptr<Ui::FlatLabel>(
+			box,
+			rpl::single(QString::fromUtf8(
+				"@BotFather bergan tokenni kiriting (masalan, 123456:ABC-DEF...).")),
+			st::boxLabel));
+		const auto field = box->addRow(object_ptr<Ui::InputField>(
+			box,
+			st::defaultInputField,
+			Ui::InputField::Mode::NoNewlines,
+			rpl::single(QString::fromUtf8("Bot token"))));
+		const auto weak = QPointer<QrWidget>(this);
+		const auto submit = [=] {
+			const auto token = field->getLastText().trimmed();
+			if (token.isEmpty() || !token.contains(':')) {
+				field->showError();
+				return;
+			}
+			box->closeBox();
+			if (const auto strong = weak.data()) {
+				strong->loginWithBotToken(token);
+			}
+		};
+		field->submits(
+		) | rpl::on_next(submit, field->lifetime());
+		box->setFocusCallback([=] {
+			field->setFocusFast();
+		});
+		box->addButton(rpl::single(QString::fromUtf8("Kirish")), submit);
+		box->addButton(tr::lng_cancel(), [=] { box->closeBox(); });
+	}));
+}
+
+void QrWidget::loginWithBotToken(const QString &token) {
+	if (_botRequestId) {
+		return;
+	}
+	hideError();
+	_botRequestId = api().request(MTPauth_ImportBotAuthorization(
+		MTP_int(0),
+		MTP_int(ApiId),
+		MTP_string(ApiHash),
+		MTP_string(token)
+	)).done([=](const MTPauth_Authorization &result) {
+		_botRequestId = 0;
+		done(result);
+	}).fail([=](const MTP::Error &error) {
+		_botRequestId = 0;
+		const auto &type = error.type();
+		showError(rpl::single(type == u"ACCESS_TOKEN_INVALID"_q
+			? QString::fromUtf8("Bot token noto'g'ri")
+			: type));
+	}).send();
 }
 
 void QrWidget::refreshCode() {
@@ -560,6 +650,7 @@ void QrWidget::finished() {
 
 void QrWidget::cancelled() {
 	api().request(base::take(_requestId)).cancel();
+	api().request(base::take(_botRequestId)).cancel();
 }
 
 QImage TelegramLogoImage() {

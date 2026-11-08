@@ -28,7 +28,7 @@ jobs:
 
     env:
       PREPARE_PATH: "Telegram/build/prepare/prepare.py"
-      MG_VERSION: "1.1.0"
+      MG_VERSION: "1.2.0"
 
     defaults:
       run:
@@ -145,6 +145,20 @@ jobs:
           minimum-size: 16GB
           maximum-size: 40GB
           disk-root: "D:"
+
+      - name: Yumaloq (iPhone) stil.
+        shell: bash
+        run: |
+          # lib_ui submodul'idagi burchak radiuslarini kattalashtiramiz (oynalar, tugmalar, menyular, xabar pufakchalari).
+          cd "$TBUILD/$REPO_NAME/Telegram/lib_ui/ui"
+          sed -i 's/^roundRadiusLarge: 6px;/roundRadiusLarge: 12px;/; s/^roundRadiusSmall: 3px;/roundRadiusSmall: 8px;/' basic.style
+          sed -i 's/^boxRadius: 8px;/boxRadius: 16px;/' layers/layers.style
+          sed -i 's/^buttonRadius: 4px;/buttonRadius: 10px;/; s/^innerDropdownRadius: 8px;/innerDropdownRadius: 14px;/' widgets/widgets.style
+          grep -q "^roundRadiusLarge: 12px;" basic.style || { echo "::error::roundRadiusLarge almashmadi"; exit 1; }
+          grep -q "^roundRadiusSmall: 8px;" basic.style || { echo "::error::roundRadiusSmall almashmadi"; exit 1; }
+          grep -q "^boxRadius: 16px;" layers/layers.style || { echo "::error::boxRadius almashmadi"; exit 1; }
+          grep -q "^buttonRadius: 10px;" widgets/widgets.style || { echo "::error::buttonRadius almashmadi"; exit 1; }
+          grep -q "^innerDropdownRadius: 14px;" widgets/widgets.style || { echo "::error::innerDropdownRadius almashmadi"; exit 1; }
 
       - name: MilliyGram Desktop'ni yig'ish.
         env:

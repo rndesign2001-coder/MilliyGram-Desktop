@@ -46,4 +46,13 @@ rpl::producer<bool> GhostValue() {
 	return Ghost().value();
 }
 
+QString ForwardSignature() {
+	return Storage().value(u"forward/signature"_q).toString();
+}
+
+void SetForwardSignature(const QString &signature) {
+	Storage().setValue(u"forward/signature"_q, signature);
+	Storage().sync();
+}
+
 } // namespace MilliyGram
