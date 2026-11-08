@@ -24,6 +24,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_helpers.h"
+#include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "ui/boxes/choose_date_time.h"
 #include "ui/toast/toast.h"
@@ -232,8 +233,8 @@ void ShowChooseChat(
 				std::move(comment),
 				options);
 			show->hideLayer();
-			show->showToast({
-				.text = { Uz("Maxsus uzatildi") },
+			show->showToast(Ui::Toast::Config{
+				.text = TextWithEntities{ Uz("Maxsus uzatildi") },
 			});
 		},
 		.filterCallback = [=](not_null<Data::Thread*> thread) {
