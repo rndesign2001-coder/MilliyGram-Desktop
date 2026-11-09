@@ -194,8 +194,12 @@ PRIVATE
     api/api_self_destruct.cpp
     api/api_self_destruct.h
     api/api_send_progress.cpp
+    milliygram/mg_autodelete.cpp
+    milliygram/mg_autodelete.h
     milliygram/mg_forward.cpp
     milliygram/mg_forward.h
+    milliygram/mg_panels.cpp
+    milliygram/mg_panels.h
     milliygram/mg_settings.cpp
     milliygram/mg_settings.h
     milliygram/mg_themes.cpp

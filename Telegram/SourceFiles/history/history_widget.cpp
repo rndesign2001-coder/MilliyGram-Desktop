@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/history_widget.h"
 
+#include "milliygram/mg_settings.h"
+
 #include "api/api_compose_with_ai.h"
 #include "api/api_editing.h"
 #include "api/api_bot.h"
@@ -11306,7 +11308,21 @@ void HistoryWidget::drawField(Painter &p, const QRect &rect) {
 	}
 	p.setInactive(
 		controller()->isGifPausedAtLeastFor(Window::GifPauseReason::Any));
-	p.fillRect(myrtlrect(0, backy, width(), backh), st::historyReplyBg);
+	if (MilliyGram::FloatingPanels()) {
+		// MilliyGram: yozish maydoni devor qog'ozi ustida yumaloq "pill".
+		const auto inset = style::ConvertScale(8);
+		const auto pill = myrtlrect(0, backy, width(), backh).marginsRemoved(
+			{ inset, inset / 2, inset, inset / 2 });
+		const auto radius = std::min(
+			pill.height() / 2.,
+			double(style::ConvertScale(22)));
+		auto hq = PainterHighQualityEnabler(p);
+		p.setPen(Qt::NoPen);
+		p.setBrush(st::historyReplyBg);
+		p.drawRoundedRect(pill, radius, radius);
+	} else {
+		p.fillRect(myrtlrect(0, backy, width(), backh), st::historyReplyBg);
+	}
 
 	const auto media = (!_previewDrawPreview && drawMsgText)
 		? drawMsgText->media()

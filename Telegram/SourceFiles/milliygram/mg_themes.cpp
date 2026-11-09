@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "milliygram/mg_themes.h"
 
+#include "milliygram/mg_settings.h"
+
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "storage/localstorage.h"
@@ -14,6 +16,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/boxes/confirm_box.h"
 #include "ui/layers/generic_box.h"
 #include "ui/painter.h"
+#include "ui/widgets/checkbox.h"
 #include "ui/widgets/labels.h"
 #include "window/themes/window_theme.h"
 #include "window/themes/window_theme_editor_box.h"
@@ -27,6 +30,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtGui/QPainter>
 
+#include <array>
+
 namespace MilliyGram {
 namespace {
 
@@ -37,10 +42,14 @@ struct Preset {
 	const char *accent;
 	const char *name;
 	const char *kind;
+	const char *path = nullptr; // alohida mavzu fayli (rang moslashtirilmaydi)
 };
 
-constexpr auto kPresets = std::array<Preset, 7>{ {
+constexpr auto kClassicNightPath = ":/gui/night-classic.tdesktop-theme";
+
+constexpr auto kPresets = std::array<Preset, 8>{ {
 	{ Type::Night, "8b6dff", "Tun: binafsha", "Tungi mavzu" },
+	{ Type::Night, "5288c1", "Telegram klassik (tungi)", "Asl Telegram Desktop mavzusi", kClassicNightPath },
 	{ Type::Night, "16a3a3", "Tun: Samarqand firuzasi", "Tungi mavzu" },
 	{ Type::Night, "d6458f", "Tun: atlas pushtisi", "Tungi mavzu" },
 	{ Type::Night, "1ea5d6", "Tun: bayroq ko'ki", "Tungi mavzu" },
@@ -71,10 +80,16 @@ constexpr auto kPresets = std::array<Preset, 7>{ {
 	return (i != end(schemes)) ? i->accentColor : QColor();
 }
 
+[[nodiscard]] QString PresetPath(const Preset &preset) {
+	return preset.path ? Uz(preset.path) : SchemePath(preset.type);
+}
+
 [[nodiscard]] bool IsActive(const Preset &preset) {
 	const auto &object = Window::Theme::Background()->themeObject();
-	if (object.cloud.id || object.pathAbsolute != SchemePath(preset.type)) {
+	if (object.cloud.id || object.pathAbsolute != PresetPath(preset)) {
 		return false;
+	} else if (preset.path) {
+		return true;
 	}
 	const auto &colors = Core::App().settings().themesAccentColors();
 	const auto current = colors.get(preset.type).value_or(
@@ -92,14 +107,16 @@ void ApplyPreset(
 			tr::lng_theme_editor_cant_change_theme()));
 		return;
 	}
-	auto &settings = Core::App().settings();
-	settings.setSystemAccentColorEnabled(false);
-	settings.themesAccentColors().set(
-		preset.type,
-		QColor(Uz("#") + Uz(preset.accent)));
-	Local::writeSettings();
+	if (!preset.path) {
+		auto &settings = Core::App().settings();
+		settings.setSystemAccentColorEnabled(false);
+		settings.themesAccentColors().set(
+			preset.type,
+			QColor(Uz("#") + Uz(preset.accent)));
+		Local::writeSettings();
+	}
 
-	const auto path = SchemePath(preset.type);
+	const auto path = PresetPath(preset);
 	const auto night = (preset.type != Type::DayBlue)
 		&& (preset.type != Type::Default);
 	if (IsNightMode() == night) {
@@ -128,6 +145,26 @@ void ShowThemesBox(not_null<Window::SessionController*> controller) {
 				"Tayyor mavzuni tanlang. Yangi mavzuni o'zingiz "
 				"yaratish uchun pastdagi tugmani bosing.")),
 			st::boxLabel));
+
+		const auto floating = box->addRow(object_ptr<Ui::Checkbox>(
+			box,
+			rpl::single(Uz("Suzuvchi yumaloq panellar")),
+			FloatingPanels(),
+			st::defaultBoxCheckbox));
+		floating->checkedValue(
+		) | rpl::skip(1) | rpl::on_next([](bool checked) {
+			SetFloatingPanels(checked);
+		}, floating->lifetime());
+		const auto horizontal = box->addRow(object_ptr<Ui::Checkbox>(
+			box,
+			rpl::single(Uz("Jildlar tepada (tab ko'rinishida)")),
+			Core::App().settings().chatFiltersHorizontal(),
+			st::defaultBoxCheckbox));
+		horizontal->checkedValue(
+		) | rpl::skip(1) | rpl::on_next([](bool checked) {
+			Core::App().settings().setChatFiltersHorizontal(checked);
+			Core::App().saveSettingsDelayed();
+		}, horizontal->lifetime());
 
 		const auto rowHeight = st::normalFont->height * 3;
 		for (const auto &preset : kPresets) {

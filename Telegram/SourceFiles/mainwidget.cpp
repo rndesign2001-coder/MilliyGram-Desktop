@@ -7,6 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "mainwidget.h"
 
+#include "milliygram/mg_panels.h"
+#include "milliygram/mg_settings.h"
+
 #include "api/api_updates.h"
 #include "api/api_views.h"
 #include "data/components/scheduled_messages.h"
@@ -444,6 +447,12 @@ MainWidget::MainWidget(
 	} else {
 		_history->show();
 	}
+	_mgCorners = std::make_unique<MilliyGram::PanelCorners>(this);
+	MilliyGram::FloatingPanelsValue(
+	) | rpl::skip(1) | rpl::on_next([=] {
+		updateControlsGeometry();
+		update();
+	}, lifetime());
 	orderWidgets();
 
 	if (!Core::UpdaterDisabled()) {
@@ -2462,6 +2471,9 @@ void MainWidget::orderWidgets() {
 		_player->entity()->raiseDropdowns();
 	}
 	if (_hider) _hider->raise();
+	if (_mgCorners) {
+		_mgCorners->raise();
+	}
 }
 
 QPixmap MainWidget::grabForShowAnimation(const Window::SectionSlideParams &params) {
@@ -2493,11 +2505,13 @@ QPixmap MainWidget::grabForShowAnimation(const Window::SectionSlideParams &param
 		if (_thirdShadow) {
 			_thirdShadow->hide();
 		}
+		const auto mgM = mgFloating() ? MilliyGram::PanelMargin() : 0;
+		const auto mgG = mgFloating() ? MilliyGram::PanelHalfGap() : 0;
 		result = Ui::GrabWidget(this, QRect(
-			_dialogsWidth,
-			sectionTop,
-			width() - _dialogsWidth,
-			height() - sectionTop));
+			_dialogsWidth + mgG,
+			sectionTop + mgM,
+			width() - _dialogsWidth - mgG - mgM,
+			height() - sectionTop - 2 * mgM));
 		if (_sideShadow) {
 			_sideShadow->show();
 		}
@@ -2563,9 +2577,18 @@ void MainWidget::showFinished() {
 	activate();
 }
 
+bool MainWidget::mgFloating() const {
+	return MilliyGram::FloatingPanels() && !isOneColumn();
+}
+
 void MainWidget::paintEvent(QPaintEvent *e) {
 	if (_background) {
 		checkChatBackground();
+	}
+	if (mgFloating() && !_showAnimation) {
+		// MilliyGram: panellar orasidagi bo'shliq rangi.
+		auto p = QPainter(this);
+		p.fillRect(e->rect(), MilliyGram::PanelGapColor());
 	}
 	if (_showAnimation) {
 		auto p = QPainter(this);
@@ -2769,14 +2792,25 @@ void MainWidget::updateControlsGeometry() {
 			_contentScrollAddToY);
 		if (_hider) _hider->setGeometry(0, 0, dialogsWidth, height());
 	} else {
+		// MilliyGram: suzuvchi panellar — tashqi chet (m) va panellar
+		// orasidagi bo'shliq (2 * g). Ustunlar chegarasi o'zgarmaydi.
+		const auto floating = mgFloating();
+		const auto m = floating ? MilliyGram::PanelMargin() : 0;
+		const auto g = floating ? MilliyGram::PanelHalfGap() : 0;
+		auto mgPanels = std::vector<QRect>();
+
 		auto thirdSectionWidth = _thirdSection ? _thirdColumnWidth : 0;
 		if (_thirdSection) {
 			auto thirdSectionTop = getThirdSectionTop();
-			_thirdSection->setGeometry(
-				width() - thirdSectionWidth,
-				thirdSectionTop,
-				thirdSectionWidth,
-				height() - thirdSectionTop);
+			const auto third = QRect(
+				width() - thirdSectionWidth + g,
+				thirdSectionTop + m,
+				thirdSectionWidth - g - m,
+				height() - thirdSectionTop - 2 * m);
+			_thirdSection->setGeometry(third);
+			if (floating) {
+				mgPanels.push_back(third);
+			}
 		}
 		const auto shadowTop = _controller->window().verticalShadowTop();
 		const auto shadowHeight = height() - shadowTop;
@@ -2784,59 +2818,89 @@ void MainWidget::updateControlsGeometry() {
 			accumulate_min(
 				dialogsWidth,
 				width() - st::columnMinimalWidthMain);
-			_dialogs->setGeometryToLeft(0, 0, dialogsWidth, height());
+			const auto narrow = (dialogsWidth < st::columnMinimalWidthLeft);
+			const auto dm = narrow ? 0 : m;
+			const auto dialogs = QRect(
+				dm,
+				dm,
+				dialogsWidth - dm - (narrow ? 0 : g),
+				height() - 2 * dm);
+			_dialogs->setGeometryToLeft(
+				dialogs.x(),
+				dialogs.y(),
+				dialogs.width(),
+				dialogs.height());
+			if (floating && !narrow) {
+				mgPanels.push_back(dialogs);
+			}
 		}
 		if (_sideShadow) {
 			_sideShadow->setGeometryToLeft(
 				dialogsWidth,
 				shadowTop,
-				st::lineWidth,
-				shadowHeight);
+				floating ? 0 : st::lineWidth,
+				floating ? 0 : shadowHeight);
 		}
 		if (_thirdShadow) {
 			_thirdShadow->setGeometryToLeft(
 				width() - thirdSectionWidth - st::lineWidth,
 				shadowTop,
-				st::lineWidth,
-				shadowHeight);
+				floating ? 0 : st::lineWidth,
+				floating ? 0 : shadowHeight);
 		}
+		const auto mainLeft = dialogsWidth + g;
 		const auto mainSectionWidth = width()
 			- dialogsWidth
-			- thirdSectionWidth;
+			- thirdSectionWidth
+			- g
+			- (_thirdSection ? g : m);
 		if (_callTopBar) {
 			_callTopBar->resizeToWidth(mainSectionWidth);
-			_callTopBar->moveToLeft(dialogsWidth, 0);
+			_callTopBar->moveToLeft(mainLeft, m);
 		}
 		if (_exportTopBar) {
 			_exportTopBar->resizeToWidth(mainSectionWidth);
-			_exportTopBar->moveToLeft(dialogsWidth, _callTopBarHeight);
+			_exportTopBar->moveToLeft(mainLeft, m + _callTopBarHeight);
 		}
 		if (_player) {
 			_player->resizeToWidth(mainSectionWidth);
 			_player->moveToLeft(
-				dialogsWidth,
-				_callTopBarHeight + _exportTopBarHeight);
+				mainLeft,
+				m + _callTopBarHeight + _exportTopBarHeight);
 		}
 		_history->setGeometryWithTopMoved(QRect(
-			dialogsWidth,
-			mainSectionTop,
+			mainLeft,
+			m + mainSectionTop,
 			mainSectionWidth,
-			height() - mainSectionTop
+			height() - mainSectionTop - 2 * m
 		), _contentScrollAddToY);
 		if (_hider) {
 			_hider->setGeometryToLeft(
-				dialogsWidth,
-				0,
+				mainLeft,
+				m,
 				mainSectionWidth,
-				height());
+				height() - 2 * m);
 		}
+		if (floating) {
+			mgPanels.push_back(QRect(
+				mainLeft,
+				m,
+				mainSectionWidth,
+				height() - 2 * m));
+		}
+		if (_mgCorners) {
+			_mgCorners->update(mgPanels);
+		}
+	}
+	if (isOneColumn() && _mgCorners) {
+		_mgCorners->update({});
 	}
 	if (_mainSection) {
 		const auto mainSectionGeometry = QRect(
 			_history->x(),
-			mainSectionTop,
+			_history->y(),
 			_history->width(),
-			height() - mainSectionTop);
+			_history->height());
 		_mainSection->setGeometryWithTopMoved(
 			mainSectionGeometry,
 			_contentScrollAddToY);
@@ -2861,10 +2925,11 @@ void MainWidget::destroyThirdSection() {
 }
 
 void MainWidget::refreshResizeAreas() {
+	const auto mgGap = mgFloating() ? MilliyGram::PanelHalfGap() : 0;
 	if (!isOneColumn() && _dialogs) {
 		ensureFirstColumnResizeAreaCreated();
 		_firstColumnResizeArea->setGeometryToLeft(
-			_history->x(),
+			_history->x() - mgGap,
 			0,
 			st::historyResizeWidth,
 			height());
@@ -2875,7 +2940,7 @@ void MainWidget::refreshResizeAreas() {
 	if (isThreeColumn() && _thirdSection) {
 		ensureThirdColumnResizeAreaCreated();
 		_thirdColumnResizeArea->setGeometryToLeft(
-			_thirdSection->x(),
+			_thirdSection->x() - mgGap,
 			0,
 			st::historyResizeWidth,
 			height());

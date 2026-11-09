@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "dialogs/ui/dialogs_layout.h"
 
+#include "milliygram/mg_settings.h"
+
 #include "base/options.h"
 #include "base/unixtime.h"
 #include "core/ui_integration.h"
@@ -484,7 +486,24 @@ void PaintRow(
 	if (swipeTranslation) {
 		p.translate(swipeMirrored ? swipeTranslation : -swipeTranslation, 0);
 	}
-	p.fillRect(geometry, bg);
+	if (MilliyGram::FloatingPanels()
+		&& !context.narrow
+		&& (context.active || context.selected)) {
+		// MilliyGram: tanlangan / ustidagi chat — yumaloq "pill".
+		const QBrush base = context.currentBg;
+		p.fillRect(geometry, base);
+		auto hq = PainterHighQualityEnabler(p);
+		const auto inset = style::ConvertScale(6);
+		const auto radius = style::ConvertScale(12);
+		p.setPen(Qt::NoPen);
+		p.setBrush(bg);
+		p.drawRoundedRect(
+			geometry.marginsRemoved({ inset, 2, inset, 2 }),
+			radius,
+			radius);
+	} else {
+		p.fillRect(geometry, bg);
+	}
 	if (!(flags & Flag::TopicJumpRipple)) {
 		auto ripple = context.active
 			? st::dialogsRippleBgActive

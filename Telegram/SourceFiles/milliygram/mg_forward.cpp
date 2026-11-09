@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "milliygram/mg_forward.h"
 
 #include "milliygram/mg_settings.h"
+#include "milliygram/mg_autodelete.h"
 
 #include "api/api_common.h"
 #include "api/api_sending.h"
@@ -16,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/abstract_box.h"
 #include "boxes/share_box.h"
 #include "chat_helpers/compose/compose_show.h"
+#include "chat_helpers/message_field.h"
 #include "data/data_chat_participant_status.h"
 #include "data/data_document.h"
 #include "data/data_media_types.h"
@@ -40,6 +42,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_layers.h"
 
 #include <QtCore/QDateTime>
+#include <array>
 #include <QtCore/QRegularExpression>
 
 namespace MilliyGram {
@@ -54,7 +57,20 @@ struct State {
 	bool spoiler = false;
 	bool silent = false;
 	TimeId scheduled = 0;
+	TimeId autoDelete = 0;
 };
+
+// Avto-o'chirish variantlari (soniya), 0 — o'chirilmaydi.
+constexpr auto kAutoDeleteOptions = std::array<TimeId, 8>{ {
+	0,
+	15 * 60,
+	60 * 60,
+	6 * 60 * 60,
+	12 * 60 * 60,
+	24 * 60 * 60,
+	2 * 24 * 60 * 60,
+	7 * 24 * 60 * 60,
+} };
 
 [[nodiscard]] QString Uz(const char *text) {
 	return QString::fromUtf8(text);
@@ -114,6 +130,56 @@ void ShowSignatureBox(Fn<void(QString)> done) {
 	}));
 }
 
+[[nodiscard]] QString AutoDeleteText(TimeId ttl) {
+	const auto value = [&]() -> QString {
+		if (!ttl) {
+			return Uz("yo'q");
+		} else if (ttl < 60 * 60) {
+			return QString::number(ttl / 60) + Uz(" daqiqa");
+		} else if (ttl < 24 * 60 * 60) {
+			return QString::number(ttl / 3600) + Uz(" soat");
+		}
+		return QString::number(ttl / 86400) + Uz(" kun");
+	}();
+	return Uz("Avto-o'chirish: ") + value;
+}
+
+// Havola tugmalarini qatorlarga sig'dirib joylaydi.
+void AddFlowLinks(
+		not_null<Ui::GenericBox*> box,
+		std::vector<std::pair<QString, Fn<void()>>> actions) {
+	const auto container = box->addRow(object_ptr<Ui::RpWidget>(box));
+	auto buttons = std::make_shared<std::vector<Ui::LinkButton*>>();
+	for (auto &[text, callback] : actions) {
+		const auto button = Ui::CreateChild<Ui::LinkButton>(
+			container,
+			text);
+		button->setClickedCallback(std::move(callback));
+		buttons->push_back(button);
+	}
+	container->widthValue(
+	) | rpl::on_next([=](int width) {
+		const auto hskip = st::normalFont->spacew * 4;
+		const auto vskip = st::normalFont->height / 2;
+		auto x = 0;
+		auto y = 0;
+		auto rowHeight = 0;
+		for (const auto button : *buttons) {
+			const auto w = button->width();
+			const auto h = button->height();
+			if (x > 0 && x + w > width) {
+				x = 0;
+				y += rowHeight + vskip;
+				rowHeight = 0;
+			}
+			button->moveToLeft(x, y);
+			x += w + hskip;
+			rowHeight = std::max(rowHeight, h);
+		}
+		container->resize(width, y + rowHeight);
+	}, container->lifetime());
+}
+
 [[nodiscard]] QString ScheduleText(TimeId time) {
 	return time
 		? Uz("Yuborish vaqti: ")
@@ -140,6 +206,7 @@ void SendCustom(
 		options.scheduled = state->scheduled;
 	}
 	auto &api = session->api();
+	const auto localFrom = owner->nextLocalMessageId();
 	for (const auto &thread : threads) {
 		if (!comment.text.isEmpty()) {
 			auto message = Api::MessageToSend(
@@ -195,6 +262,10 @@ void SendCustom(
 				api.sendMessage(std::move(message));
 			}
 		}
+	}
+	const auto localTill = owner->nextLocalMessageId();
+	if (state->autoDelete > 0 && !options.scheduled) {
+		RegisterAutoDelete(session, localFrom, localTill, state->autoDelete);
 	}
 }
 
@@ -293,31 +364,45 @@ void ShowCustomForward(
 			state->original));
 		field->setMaxHeight(st::boxWideWidth / 2);
 
+		// Matn formati: belgilangan qismga qo'llanadi (Ctrl+B/I/U, Ctrl+K — havola).
+		InitMessageFieldHandlers({
+			.session = session,
+			.show = show,
+			.field = field,
+			.customEmojiPaused = [=] {
+				return show->paused(ChatHelpers::PauseReason::Layer);
+			},
+		});
+		const auto format = [=](const QString &tag) {
+			return [=] {
+				field->toggleCurrentMarkdownTag(tag);
+				field->setFocusFast();
+			};
+		};
+		using Field = Ui::InputField;
+		AddFlowLinks(box, {
+			{ Uz("Qalin"), format(Field::kTagBold) },
+			{ Uz("Qiya"), format(Field::kTagItalic) },
+			{ Uz("Tagi chizilgan"), format(Field::kTagUnderline) },
+			{ Uz("Ustidan chizilgan"), format(Field::kTagStrikeOut) },
+			{ Uz("Kod"), format(Field::kTagCode) },
+			{ Uz("Spoiler"), format(Field::kTagSpoiler) },
+			{ Uz("Iqtibos"), format(Field::kTagBlockquote) },
+			{ Uz("Formatni tozalash"), [=] {
+				field->clearCurrentMarkdown();
+				field->setFocusFast();
+			} },
+		});
+		box->addRow(object_ptr<Ui::FlatLabel>(
+			box,
+			rpl::single(Uz(
+				"Matnni belgilab formatni tanlang. Havola: matnni belgilab Ctrl+K.")),
+			st::boxDividerLabel));
+
 		box->addRow(object_ptr<Ui::FlatLabel>(
 			box,
 			rpl::single(Uz("2. Tezkor amallar")),
 			st::boxLabel));
-		const auto actions = box->addRow(object_ptr<Ui::RpWidget>(box));
-		auto buttons = std::make_shared<std::vector<Ui::LinkButton*>>();
-		const auto addAction = [=](const QString &text, Fn<void()> callback) {
-			const auto button = Ui::CreateChild<Ui::LinkButton>(
-				actions,
-				text);
-			button->setClickedCallback(std::move(callback));
-			buttons->push_back(button);
-		};
-		addAction(Uz("Asl matn"), [=] {
-			field->setTextWithTags(state->original);
-		});
-		addAction(Uz("Havolalarni o'chirish"), [=] {
-			field->setText(RemoveLinks(field->getLastText(), false));
-		});
-		addAction(Uz("@ va linklarni tozalash"), [=] {
-			field->setText(RemoveLinks(field->getLastText(), true));
-		});
-		addAction(Uz("Formatsiz"), [=] {
-			field->setText(field->getLastText());
-		});
 		const auto appendSignature = [=](const QString &signature) {
 			if (signature.isEmpty()) {
 				return;
@@ -329,38 +414,28 @@ void ShowCustomForward(
 			now.text += signature;
 			field->setTextWithTags(now);
 		};
-		addAction(Uz("Imzo qo'shish"), [=] {
-			const auto signature = ForwardSignature();
-			if (signature.isEmpty()) {
-				ShowSignatureBox(appendSignature);
-			} else {
-				appendSignature(signature);
-			}
-		});
-		addAction(Uz("Imzoni o'rnatish"), [=] {
-			ShowSignatureBox(nullptr);
-		});
-		actions->widthValue(
-		) | rpl::on_next([=](int width) {
-			const auto hskip = st::normalFont->spacew * 4;
-			const auto vskip = st::normalFont->height / 2;
-			auto x = 0;
-			auto y = 0;
-			auto rowHeight = 0;
-			for (const auto button : *buttons) {
-				const auto w = button->width();
-				const auto h = button->height();
-				if (x > 0 && x + w > width) {
-					x = 0;
-					y += rowHeight + vskip;
-					rowHeight = 0;
+		AddFlowLinks(box, {
+			{ Uz("Asl matn"), [=] {
+				field->setTextWithTags(state->original);
+			} },
+			{ Uz("Havolalarni o'chirish"), [=] {
+				field->setText(RemoveLinks(field->getLastText(), false));
+			} },
+			{ Uz("@ va linklarni tozalash"), [=] {
+				field->setText(RemoveLinks(field->getLastText(), true));
+			} },
+			{ Uz("Imzo qo'shish"), [=] {
+				const auto signature = ForwardSignature();
+				if (signature.isEmpty()) {
+					ShowSignatureBox(appendSignature);
+				} else {
+					appendSignature(signature);
 				}
-				button->moveToLeft(x, y);
-				x += w + hskip;
-				rowHeight = std::max(rowHeight, h);
-			}
-			actions->resize(width, y + rowHeight);
-		}, actions->lifetime());
+			} },
+			{ Uz("Imzoni o'rnatish"), [=] {
+				ShowSignatureBox(nullptr);
+			} },
+		});
 
 		box->addRow(object_ptr<Ui::FlatLabel>(
 			box,
@@ -410,6 +485,26 @@ void ShowCustomForward(
 				});
 			}));
 		});
+
+		const auto autoDelete = box->addRow(object_ptr<Ui::LinkButton>(
+			box,
+			AutoDeleteText(0)));
+		autoDelete->setClickedCallback([=] {
+			const auto i = ranges::find(kAutoDeleteOptions, state->autoDelete);
+			const auto next = (i == end(kAutoDeleteOptions)
+				|| (i + 1) == end(kAutoDeleteOptions))
+				? kAutoDeleteOptions.front()
+				: *(i + 1);
+			state->autoDelete = next;
+			autoDelete->setText(AutoDeleteText(next));
+		});
+		box->addRow(object_ptr<Ui::FlatLabel>(
+			box,
+			rpl::single(Uz(
+				"Avto-o'chirish: yuborilgan post belgilangan vaqtdan keyin hamma "
+				"uchun o'chiriladi (MilliyGram ochiq bo'lishi kerak, yopiq bo'lsa "
+				"keyingi ochilishda). Vaqti belgilangan postlarga qo'llanmaydi.")),
+			st::boxDividerLabel));
 
 		box->addRow(object_ptr<Ui::FlatLabel>(
 			box,

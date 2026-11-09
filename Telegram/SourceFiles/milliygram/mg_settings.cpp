@@ -27,7 +27,30 @@ namespace {
 	return result;
 }
 
+[[nodiscard]] rpl::variable<bool> &Floating() {
+	static auto result = rpl::variable<bool>(
+		Storage().value(u"ui/floating_panels"_q, true).toBool());
+	return result;
+}
+
 } // namespace
+
+bool FloatingPanels() {
+	return Floating().current();
+}
+
+void SetFloatingPanels(bool enabled) {
+	if (Floating().current() == enabled) {
+		return;
+	}
+	Storage().setValue(u"ui/floating_panels"_q, enabled);
+	Storage().sync();
+	Floating() = enabled;
+}
+
+rpl::producer<bool> FloatingPanelsValue() {
+	return Floating().value();
+}
 
 bool GhostEnabled() {
 	return Ghost().current();

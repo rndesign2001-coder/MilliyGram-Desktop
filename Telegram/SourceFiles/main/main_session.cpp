@@ -61,6 +61,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "support/support_helper.h"
 #include "lang/lang_keys.h"
 #include "core/application.h"
+#include "milliygram/mg_autodelete.h"
 #include "ui/text/text_utilities.h"
 #include "ui/layers/generic_box.h"
 #include "styles/style_layers.h"
@@ -189,6 +190,8 @@ Session::Session(
 
 	_api->requestTermsUpdate();
 	_api->requestFullPeer(_user);
+
+	MilliyGram::StartAutoDelete(this); // MilliyGram: xabarlarni avto-o'chirish navbati
 
 	_api->instance().setUserPhone(_user->phone());
 

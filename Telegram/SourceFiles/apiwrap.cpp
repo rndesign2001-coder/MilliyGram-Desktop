@@ -929,6 +929,13 @@ void ApiWrap::requestMoreDialogs(Data::Folder *folder) {
 		return;
 	} else if (_dialogsLoadBlockedByDate.current()) {
 		return;
+	} else if (_session->user()->isBot()) {
+		// MilliyGram: bot akkauntlari messages.getDialogs ni chaqira olmaydi —
+		// ro'yxat yuklangan deb belgilanadi, chatlar kelgan xabarlar bilan to'ladi.
+		state->listReceived = true;
+		state->pinnedReceived = true;
+		dialogsLoadFinish(folder); // may kill 'state'.
+		return;
 	}
 
 	const auto firstLoad = !state->offsetDate;

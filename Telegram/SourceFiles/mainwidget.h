@@ -64,6 +64,10 @@ struct Content;
 } // namespace View
 } // namespace Export
 
+namespace MilliyGram {
+class PanelCorners;
+} // namespace MilliyGram
+
 namespace Ui {
 class ChatTheme;
 class ResizeArea;
@@ -357,6 +361,8 @@ private:
 
 	const base::unique_qptr<Ui::PlainShadow> _sideShadow;
 	object_ptr<Ui::PlainShadow> _thirdShadow = { nullptr };
+	std::unique_ptr<MilliyGram::PanelCorners> _mgCorners; // MilliyGram: yumaloq panellar
+	[[nodiscard]] bool mgFloating() const;
 	object_ptr<Ui::ResizeArea> _firstColumnResizeArea = { nullptr };
 	object_ptr<Ui::ResizeArea> _thirdColumnResizeArea = { nullptr };
 
