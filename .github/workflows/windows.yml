@@ -140,7 +140,7 @@ jobs:
           exit 1
 
       - name: Virtual xotira (pagefile) — Release kompilyatsiyasi uchun.
-        uses: al-cheb/configure-pagefile-action@v1.4
+        uses: al-cheb/configure-pagefile-action@v1.5
         with:
           minimum-size: 16GB
           maximum-size: 40GB
